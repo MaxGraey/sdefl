@@ -13,7 +13,7 @@ static const unsigned char sdefl_mirror[256] = {
 static unsigned
 sdefl_adler32(unsigned adler32, const unsigned char *in, int in_len)
 {
-    #define SDEFL_ADLER_INIT  (0)
+    #define SDEFL_ADLER_INIT  (1)
     const unsigned ADLER_MOD = 65521;
     unsigned s1 = adler32 & 0xffff;
     unsigned s2 = adler32 >> 16;
