@@ -2,12 +2,43 @@
 
 #include <string.h> /* memcpy */
 
+#define SDEFL_ZLIB_HDR      (0x01)
+
 static const unsigned char sdefl_mirror[256] = {
     #define R2(n) n, n + 128, n + 64, n + 192
     #define R4(n) R2(n), R2(n + 32), R2(n + 16), R2(n + 48)
     #define R6(n) R4(n), R4(n +  8), R4(n +  4), R4(n + 12)
     R6(0), R6(2), R6(1), R6(3),
 };
+static unsigned
+sdefl_adler32(unsigned adler32, const unsigned char *in, int in_len)
+{
+    #define SDEFL_ADLER_INIT  (0)
+    const unsigned ADLER_MOD = 65521;
+    unsigned s1 = adler32 & 0xffff;
+    unsigned s2 = adler32 >> 16;
+    unsigned blk_len, i;
+
+    blk_len = in_len % 5552;
+    while (in_len) {
+        for (i=0; i + 7 < blk_len; i += 8) {
+            s1 += in[0]; s2 += s1;
+            s1 += in[1]; s2 += s1;
+            s1 += in[2]; s2 += s1;
+            s1 += in[3]; s2 += s1;
+            s1 += in[4]; s2 += s1;
+            s1 += in[5]; s2 += s1;
+            s1 += in[6]; s2 += s1;
+            s1 += in[7]; s2 += s1;
+            in += 8;
+        }
+        for (; i < blk_len; ++i)
+            s1 += *in++, s2 += s1;
+        s1 %= ADLER_MOD; s2 %= ADLER_MOD;
+        in_len -= blk_len;
+        blk_len = 5552;
+    } return (unsigned)(s2 << 16) + (unsigned)s1;
+}
 static int
 sdefl_npow2(int n)
 {
@@ -94,27 +125,32 @@ sdefl_lit(unsigned char *dst, struct sdefl *s, int c)
         return sdefl_put(dst, s, sdefl_mirror[0x30+c], 8);
     else return sdefl_put(dst, s, 1 + 2 * sdefl_mirror[0x90 - 144 + c], 9);
 }
-extern int
-sdeflate(struct sdefl *s, unsigned char *out,
-    const unsigned char *in, int in_len, int lvl)
+static int
+sdefl_compr(struct sdefl *s, unsigned char *out,
+    const unsigned char *in, int in_len, int lvl, unsigned flags)
 {
     int p = 0;
-    int max_chain = (lvl < 8) ? (1<<(lvl+1)): (1<<13);
     unsigned char *q = out;
+    int max_chain = (lvl < 8) ? (1<<(lvl+1)): (1<<13);
 
     s->bits = s->cnt = 0;
     for (p = 0; p < SDEFL_HASH_SIZ; ++p)
         s->tbl[p] = SDEFL_NIL;
 
-    p = 0;
+    if (flags & SDEFL_ZLIB_HDR) {
+        q = sdefl_put(q, s, 0x78, 8); /* compr method: deflate, 32k window */
+        q = sdefl_put(q, s, 0x01, 8); /* fast compression */
+    }
     q = sdefl_put(q, s, 0x01, 1); /* block */
     q = sdefl_put(q, s, 0x01, 2); /* static huffman */
+
+    p = 0;
     while (p < in_len) {
         int run, best_len = 0, dist = 0;
         int max_match = ((in_len-p)>SDEFL_MAX_MATCH) ? SDEFL_MAX_MATCH:(in_len-p);
         if (max_match > SDEFL_MIN_MATCH) {
-            int limit = ((p-SDEFL_WIN_SIZ)<SDEFL_NIL)?SDEFL_NIL:(p-SDEFL_WIN_SIZ);
             int chain_len = max_chain;
+            int limit = ((p-SDEFL_WIN_SIZ)<SDEFL_NIL)?SDEFL_NIL:(p-SDEFL_WIN_SIZ);
             int i = s->tbl[sdefl_hash32(&in[p])];
             while (i > limit) {
                 if (in[i+best_len] == in[p+best_len] &&
@@ -134,9 +170,9 @@ sdeflate(struct sdefl *s, unsigned char *out,
         }
         if (lvl >= 5 && best_len >= SDEFL_MIN_MATCH && best_len < max_match){
             const int x = p + 1;
+            int chain_len = max_chain;
             int tar_len = best_len + 1;
             int limit = ((x-SDEFL_WIN_SIZ)<SDEFL_NIL)?SDEFL_NIL:(x-SDEFL_WIN_SIZ);
-            int chain_len = max_chain;
             int i = s->tbl[sdefl_hash32(&in[p])];
             while (i > limit) {
                 if (in[i+best_len] == in[x+best_len] &&
@@ -165,11 +201,28 @@ sdeflate(struct sdefl *s, unsigned char *out,
             s->tbl[h] = p++;
         }
     }
-    /* zlib partial flush */
-    q = sdefl_put(q, s, 0, 7);
-    q = sdefl_put(q, s, 2, 10);
-    q = sdefl_put(q, s, 2, 3);
-    return (int)(q - out);
+    if (s->bits) /* flush out all remaining bits */
+        q = sdefl_put(q, s, 0, 8 - s->bits);
+    if (flags & SDEFL_ZLIB_HDR) {
+        /* optionally append adler checksum */
+        unsigned a = sdefl_adler32(SDEFL_ADLER_INIT, in, in_len);
+        for (p = 0; p < 4; ++p) {
+            q = sdefl_put(q, s, (a>>24)&0xFF, 8);
+            a <<= 8;
+        }
+    } return (int)(q - out);
+}
+extern int
+sdeflate(struct sdefl *s, unsigned char *out,
+    const unsigned char *in, int in_len, int lvl)
+{
+    return sdefl_compr(s, out, in, in_len, lvl, 0u);
+}
+extern int
+zsdeflate(struct sdefl *s, unsigned char *out,
+    const unsigned char *in, int in_len, int lvl)
+{
+    return sdefl_compr(s, out, in, in_len, lvl, SDEFL_ZLIB_HDR);
 }
 extern int
 sdefl_bound(int len)

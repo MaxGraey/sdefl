@@ -24,5 +24,6 @@ struct sdefl {
 };
 extern int sdefl_bound(int in_len);
 extern int sdeflate(struct sdefl *s, unsigned char *out, const unsigned char *in, int in_len, int lvl);
+extern int zsdeflate(struct sdefl *s, unsigned char *out, const unsigned char *in, int in_len, int lvl);
 
 #endif /* SDEFL_H_INCLUDED */
