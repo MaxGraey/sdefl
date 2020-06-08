@@ -201,8 +201,7 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
             s->tbl[h] = p++;
         }
     }
-
-    q = sdefl_put(q, s, 0, 7);
+    q = sdefl_put(q, s, 0, 7); /* end of block */
     if (s->bits) /* flush out all remaining bits */
         q = sdefl_put(q, s, 0, 8 - s->bits);
 
