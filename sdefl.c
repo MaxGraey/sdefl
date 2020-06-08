@@ -201,8 +201,11 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
             s->tbl[h] = p++;
         }
     }
+
+    q = sdefl_put(q, s, 0, 7);
     if (s->bits) /* flush out all remaining bits */
         q = sdefl_put(q, s, 0, 8 - s->bits);
+
     if (flags & SDEFL_ZLIB_HDR) {
         /* optionally append adler checksum */
         unsigned a = sdefl_adler32(SDEFL_ADLER_INIT, in, in_len);
