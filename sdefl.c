@@ -202,8 +202,8 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
         }
     }
     q = sdefl_put(q, s, 0, 7); /* end of block */
-    if (s->bits) /* flush out all remaining bits */
-        q = sdefl_put(q, s, 0, 8 - s->bits);
+    if (s->cnt) /* flush out all remaining bits */
+        q = sdefl_put(q, s, 0, 8 - s->cnt);
 
     if (flags & SDEFL_ZLIB_HDR) {
         /* optionally append adler checksum */
