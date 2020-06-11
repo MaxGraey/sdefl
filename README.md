@@ -26,6 +26,25 @@ decompress a previously compressed block of memory call `sinflate`. Pass
 your compressed block along with its size and an allocated output buffer
 with size of the uncompressed block.
 
+## Benchmark
+| Compressor name         | Compression| Decompress.| Compr. size | Ratio |
+| ---------------         | -----------| -----------| ----------- | ----- |
+| libdeflate 1.3 -1       |   147 MB/s |   667 MB/s |    39597378 | 39.60 |
+| libdeflate 1.3 -6       |    69 MB/s |   689 MB/s |    36648318 | 36.65 |
+| libdeflate 1.3 -9       |    13 MB/s |   672 MB/s |    35197141 | 35.20 |
+| libdeflate 1.3 -12      |  8.13 MB/s |   670 MB/s |    35100568 | 35.10 |
+| zlib 1.2.11 -1          |    72 MB/s |   307 MB/s |    42298774 | 42.30 |
+| zlib 1.2.11 -6          |    24 MB/s |   313 MB/s |    36548921 | 36.55 |
+| zlib 1.2.11 -9          |    20 MB/s |   314 MB/s |    36475792 | 36.48 |
+| sdefl 1.0 -0            |   115 MB/s |    94 MB/s |    46489930 | 46.49 |
+| sdefl 1.0 -1            |   102 MB/s |    96 MB/s |    45291608 | 45.29 |
+| sdefl 1.0 -5            |    56 MB/s |   100 MB/s |    43983562 | 43.98 |
+| sdefl 1.0 -8            |    45 MB/s |   100 MB/s |    43914863 | 43.91 |
+| miniz 1.0 -1            |   122 MB/s |   208 MB/s |    48510028 | 48.51 |
+| miniz 1.0 -6            |    27 MB/s |   260 MB/s |    36513697 | 36.51 |
+| miniz 1.0 -9            |    23 MB/s |   261 MB/s |    36460101 | 36.46 |
+
+
 ## License
 ```
 ------------------------------------------------------------------------------
