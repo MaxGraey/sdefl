@@ -13,6 +13,8 @@ ratio to some of the newer algorithms.
 - Small ~300 LoC implementation (Deflate: 170 LoC, Inflate: 150 LoC)
 - 8 configurable compression level
 - Dual license with either MIT or public domain
+- Deflate compiles down to ~3.7 KB uncompressed wasm and ~2.2KB compressed wasm
+- Inflate compiles down to ~3.6 KB uncompressed wasm and ~2.2KB compressed wasm
 
 ## Usage
 For deflating add sdefl(.h+.c) into your project and include `sdefl.h`. To actually
