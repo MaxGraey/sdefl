@@ -14,8 +14,8 @@ ratio to some of the newer algorithms.
 - 8 configurable compression level
 - Dual license with either MIT or public domain
 - Webassembly:
-    o Deflate ~3.7 KB (~2.2KB compressed)
-    o Inflate ~3.6 KB (~2.2KB compressed)
+    ..* Deflate ~3.7 KB (~2.2KB compressed)
+    ..* Inflate ~3.6 KB (~2.2KB compressed)
 
 ## Usage
 For deflating add sdefl(.h+.c) into your project and include `sdefl.h`. To actually
