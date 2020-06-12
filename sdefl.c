@@ -83,8 +83,6 @@ sdefl_hash32(const void *p)
 static unsigned char*
 sdefl_put(unsigned char *dst, struct sdefl *s, int code, int bitcnt)
 {
-    if (!bitcnt && code != 0)
-        assert(code == 0);
     s->bits |= (code << s->cnt);
     s->cnt += bitcnt;
     while (s->cnt >= 8) {
