@@ -77,9 +77,6 @@ sdefl_hash32(const void *p)
     unsigned n = sdefl_uload32(p);
     return (n*0x9E377989)>>(32-SDEFL_HASH_BITS);
 }
-
-#include <assert.h>
-
 static unsigned char*
 sdefl_put(unsigned char *dst, struct sdefl *s, int code, int bitcnt)
 {
