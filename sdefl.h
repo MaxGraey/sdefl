@@ -8,7 +8,7 @@
 #define SDEFL_MIN_MATCH     4
 #define SDEFL_MAX_MATCH     258
 
-#define SDEFL_HASH_BITS     19
+#define SDEFL_HASH_BITS     15
 #define SDEFL_HASH_SIZ      (1 << SDEFL_HASH_BITS)
 #define SDEFL_HASH_MSK      (SDEFL_HASH_SIZ-1)
 #define SDEFL_NIL           (-1)

@@ -54,7 +54,7 @@ static int
 sdefl_ilog2(int n)
 {
     #define lt(n) n,n,n,n, n,n,n,n, n,n,n,n ,n,n,n,n
-    static const char tbl[256] = {-1,0,1,1,2,2,2,2,3,3,3,3,
+    static const char tbl[256] = {0,0,1,1,2,2,2,2,3,3,3,3,
         3,3,3,3,lt(4),lt(5),lt(5),lt(6),lt(6),lt(6),lt(6),
         lt(7),lt(7),lt(7),lt(7),lt(7),lt(7),lt(7),lt(7)
     }; int tt, t;
@@ -77,9 +77,14 @@ sdefl_hash32(const void *p)
     unsigned n = sdefl_uload32(p);
     return (n*0x9E377989)>>(32-SDEFL_HASH_BITS);
 }
+
+#include <assert.h>
+
 static unsigned char*
 sdefl_put(unsigned char *dst, struct sdefl *s, int code, int bitcnt)
 {
+    if (!bitcnt && code != 0)
+        assert(code == 0);
     s->bits |= (code << s->cnt);
     s->cnt += bitcnt;
     while (s->cnt >= 8) {
@@ -91,31 +96,40 @@ sdefl_put(unsigned char *dst, struct sdefl *s, int code, int bitcnt)
 static unsigned char*
 sdefl_match(unsigned char *dst, struct sdefl *s, int dist, int len)
 {
-    static const short lxmin[] = {0,11,19,35,67,131};
-    static const short dxmax[] = {0,6,12,24,48,96,192,384,768,1536,3072,6144,12288,24576};
-    static const short lmin[] = {11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227};
+    static const char lxn[] = {0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0};
+    static const short lmin[] = {3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,
+        51,59,67,83,99,115,131,163,195,227,258};
     static const short dmin[] = {1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,
         385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577};
-
-    /* length encoding */
-    int lc = len;
-    int lx = sdefl_ilog2(len - 3) - 2;
-    if (!(lx = (lx < 0) ? 0: lx)) lc += 254;
-    else if (len >= 258) lx = 0, lc = 285;
-    else lc = ((lx-1) << 2) + 265 + ((len - lxmin[lx]) >> lx);
-
-    if (lc <= 279)
-        dst = sdefl_put(dst, s, sdefl_mirror[(lc - 256) << 1], 7);
-    else dst = sdefl_put(dst, s, sdefl_mirror[0xc0 - 280 + lc], 8);
-    if (lx) dst = sdefl_put(dst, s, len - lmin[lc - 265], lx);
-
-    /* distance encoding */
-    {int dc = dist - 1;
+    static const short dxmax[] = {0,6,12,24,48,96,192,384,768,1536,3072,6144,12288,24576};
+    static const unsigned char lslot[258+1] = {
+        0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 12,
+        12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 16,
+        16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18,
+        18, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20,
+        20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21,
+        21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22,
+        22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+        23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+        24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25,
+        25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+        25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26,
+        26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26,
+        26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
+        27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
+        27, 27, 28
+    };
+    int ls = lslot[len];
+    int lc = 257 + ls;
     int dx = sdefl_ilog2(sdefl_npow2(dist) >> 2);
-    if ((dx = (dx < 0) ? 0: dx))
-        dc = ((dx + 1) << 1) + (dist > dxmax[dx]);
+    int dc = dx ? ((dx + 1) << 1) + (dist > dxmax[dx]) : dist-1;
+
+    if (lc < 280)
+        dst = sdefl_put(dst, s, sdefl_mirror[(lc-256)<<1], 7);
+    else dst = sdefl_put(dst, s, sdefl_mirror[(0xc0-280+lc)], 8);
+    dst = sdefl_put(dst, s, len - lmin[ls], lxn[ls]);
     dst = sdefl_put(dst, s, sdefl_mirror[dc << 3], 5);
-    if (dx) dst = sdefl_put(dst, s, dist - dmin[dc], dx);}
+    dst = sdefl_put(dst, s, dist - dmin[dc], dx);
     return dst;
 }
 static unsigned char*
@@ -137,14 +151,13 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
     for (p = 0; p < SDEFL_HASH_SIZ; ++p)
         s->tbl[p] = SDEFL_NIL;
 
+    p = 0;
     if (flags & SDEFL_ZLIB_HDR) {
-        q = sdefl_put(q, s, 0x78, 8); /* compr method: deflate, 32k window */
+        q = sdefl_put(q, s, 0x78, 8); /* deflate, 32k window */
         q = sdefl_put(q, s, 0x01, 8); /* fast compression */
     }
     q = sdefl_put(q, s, 0x01, 1); /* block */
     q = sdefl_put(q, s, 0x01, 2); /* static huffman */
-
-    p = 0;
     while (p < in_len) {
         int run, best_len = 0, dist = 0;
         int max_match = ((in_len-p)>SDEFL_MAX_MATCH) ? SDEFL_MAX_MATCH:(in_len-p);
@@ -204,7 +217,6 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
     q = sdefl_put(q, s, 0, 7); /* end of block */
     if (s->cnt) /* flush out all remaining bits */
         q = sdefl_put(q, s, 0, 8 - s->cnt);
-
     if (flags & SDEFL_ZLIB_HDR) {
         /* optionally append adler checksum */
         unsigned a = sdefl_adler32(SDEFL_ADLER_INIT, in, in_len);
