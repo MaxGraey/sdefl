@@ -87,19 +87,21 @@ sdefl_hash32(const void *p)
     unsigned n = sdefl_uload32(p);
     return (n*0x9E377989)>>(32-SDEFL_HASH_BITS);
 }
-static unsigned char*
-sdefl_put(unsigned char *dst, struct sdefl *s, int code, int bitcnt)
+static void
+sdefl_put(unsigned char **dst, struct sdefl *s, int code, int bitcnt)
 {
     s->bits |= (code << s->cnt);
     s->cnt += bitcnt;
     while (s->cnt >= 8) {
-        *dst++ = (unsigned char)(s->bits & 0xFF);
+        unsigned char *tar = *dst;
+        *tar = (unsigned char)(s->bits & 0xFF);
         s->bits >>= 8;
         s->cnt -= 8;
-    } return dst;
+        *dst = *dst + 1;
+    }
 }
-static unsigned char*
-sdefl_match(unsigned char *dst, struct sdefl *s, int dist, int len)
+static void
+sdefl_match(unsigned char **dst, struct sdefl *s, int dist, int len)
 {
     static const char lxn[] = {0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0};
     static const short lmin[] = {3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,
@@ -130,19 +132,18 @@ sdefl_match(unsigned char *dst, struct sdefl *s, int dist, int len)
     int dc = dx ? ((dx + 1) << 1) + (dist > dxmax[dx]) : dist-1;
 
     if (lc < 280)
-        dst = sdefl_put(dst, s, sdefl_mirror[(lc-256)<<1], 7);
-    else dst = sdefl_put(dst, s, sdefl_mirror[(0xc0-280+lc)], 8);
-    dst = sdefl_put(dst, s, len - lmin[ls], lxn[ls]);
-    dst = sdefl_put(dst, s, sdefl_mirror[dc << 3], 5);
-    dst = sdefl_put(dst, s, dist - dmin[dc], dx);
-    return dst;
+        sdefl_put(dst, s, sdefl_mirror[(lc-256)<<1], 7);
+    else sdefl_put(dst, s, sdefl_mirror[(0xc0-280+lc)], 8);
+    sdefl_put(dst, s, len - lmin[ls], lxn[ls]);
+    sdefl_put(dst, s, sdefl_mirror[dc << 3], 5);
+    sdefl_put(dst, s, dist - dmin[dc], dx);
 }
-static unsigned char*
-sdefl_lit(unsigned char *dst, struct sdefl *s, int c)
+static void
+sdefl_lit(unsigned char **dst, struct sdefl *s, int c)
 {
     if (c <= 143)
-        return sdefl_put(dst, s, sdefl_mirror[0x30+c], 8);
-    else return sdefl_put(dst, s, 1 + 2 * sdefl_mirror[0x90 - 144 + c], 9);
+        sdefl_put(dst, s, sdefl_mirror[0x30+c], 8);
+    else sdefl_put(dst, s, 1 + 2 * sdefl_mirror[0x90 - 144 + c], 9);
 }
 static void
 sdefl_fnd(struct sdefl_match *m, struct sdefl *s,
@@ -179,11 +180,11 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
 
     p = 0;
     if (flags & SDEFL_ZLIB_HDR) {
-        q = sdefl_put(q, s, 0x78, 8); /* deflate, 32k window */
-        q = sdefl_put(q, s, 0x01, 8); /* fast compression */
+        sdefl_put(&q, s, 0x78, 8); /* deflate, 32k window */
+        sdefl_put(&q, s, 0x01, 8); /* fast compression */
     }
-    q = sdefl_put(q, s, 0x01, 1); /* block */
-    q = sdefl_put(q, s, 0x01, 2); /* static huffman */
+    sdefl_put(&q, s, 0x01, 1); /* block */
+    sdefl_put(&q, s, 0x01, 2); /* static huffman */
     while (p < in_len) {
         struct sdefl_match m = {0};
         int max_match = ((in_len-p)>SDEFL_MAX_MATCH) ? SDEFL_MAX_MATCH:(in_len-p);
@@ -202,9 +203,9 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
             if (m2.len > m.len) m.len = 0;
         }
         if (m.len >= SDEFL_MIN_MATCH) {
-            q = sdefl_match(q, s, m.off, m.len);
+            sdefl_match(&q, s, m.off, m.len);
             run = m.len;
-        } else q = sdefl_lit(q, s, in[p]);
+        } else sdefl_lit(&q, s, in[p]);
 
         while (run-- != 0) {
             unsigned h = sdefl_hash32(&in[p]);
@@ -212,14 +213,14 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
             s->tbl[h] = p++;
         }
     }
-    q = sdefl_put(q, s, 0, 7); /* end of block */
+    sdefl_put(&q, s, 0, 7); /* end of block */
     if (s->cnt) /* flush out all remaining bits */
-        q = sdefl_put(q, s, 0, 8 - s->cnt);
+        sdefl_put(&q, s, 0, 8 - s->cnt);
     if (flags & SDEFL_ZLIB_HDR) {
         /* optionally append adler checksum */
         unsigned a = sdefl_adler32(SDEFL_ADLER_INIT, in, in_len);
         for (p = 0; p < 4; ++p) {
-            q = sdefl_put(q, s, (a>>24)&0xFF, 8);
+            sdefl_put(&q, s, (a>>24)&0xFF, 8);
             a <<= 8;
         }
     } return (int)(q - out);
