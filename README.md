@@ -1,8 +1,8 @@
 # Small Deflate
-SDefl is a small bare bone lossless compression library in ANSI C (ISO C90)
+SDeflate is a small bare bone lossless compression library in ANSI C (ISO C90)
 that implements the Deflate (RFC 1951) compressed data format specification standard.
 
-SDefl is mainly tuned to get as much speed and compression ratio from as little code
+SDeflate is mainly tuned to get as much speed and compression ratio from as little code
 as needed to keep the implementation as concise as possible. In addition since
 this library implements the Deflate standard some limitations including a small
 match window of only 32kb apply. So don't expect comparable speed or compression
@@ -32,6 +32,10 @@ with size of the uncompressed block.
 ## Benchmark
 | Compressor name         | Compression| Decompress.| Compr. size | Ratio |
 | ---------------         | -----------| -----------| ----------- | ----- |
+| sdefl 1.0 -0            |   115 MB/s |    94 MB/s |    46489930 | 46.49 |
+| sdefl 1.0 -1            |   102 MB/s |    96 MB/s |    45291608 | 45.29 |
+| sdefl 1.0 -5            |    56 MB/s |   100 MB/s |    43983562 | 43.98 |
+| sdefl 1.0 -8            |    45 MB/s |   100 MB/s |    43914863 | 43.91 |
 | libdeflate 1.3 -1       |   147 MB/s |   667 MB/s |    39597378 | 39.60 |
 | libdeflate 1.3 -6       |    69 MB/s |   689 MB/s |    36648318 | 36.65 |
 | libdeflate 1.3 -9       |    13 MB/s |   672 MB/s |    35197141 | 35.20 |
@@ -39,13 +43,26 @@ with size of the uncompressed block.
 | zlib 1.2.11 -1          |    72 MB/s |   307 MB/s |    42298774 | 42.30 |
 | zlib 1.2.11 -6          |    24 MB/s |   313 MB/s |    36548921 | 36.55 |
 | zlib 1.2.11 -9          |    20 MB/s |   314 MB/s |    36475792 | 36.48 |
-| sdefl 1.0 -0            |   115 MB/s |    94 MB/s |    46489930 | 46.49 |
-| sdefl 1.0 -1            |   102 MB/s |    96 MB/s |    45291608 | 45.29 |
-| sdefl 1.0 -5            |    56 MB/s |   100 MB/s |    43983562 | 43.98 |
-| sdefl 1.0 -8            |    45 MB/s |   100 MB/s |    43914863 | 43.91 |
 | miniz 1.0 -1            |   122 MB/s |   208 MB/s |    48510028 | 48.51 |
 | miniz 1.0 -6            |    27 MB/s |   260 MB/s |    36513697 | 36.51 |
 | miniz 1.0 -9            |    23 MB/s |   261 MB/s |    36460101 | 36.46 |
+
+Results on the [Silesia compression corpus][http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia]:
+
+| File    |   Original | `sdefl 0`  	| `sdefl 5` 	| `sdefl 7` |
+| :------ | ---------: | -----------------: | ---------: | ----------: |
+| dickens | 10.192.446 |  5,323,512|  4,865,325|   4,859,501 |
+| mozilla | 51.220.480 | 22,690,633 | 21,798,440 |  21,756,742 |
+| mr      |  9.970.564 | 4,921,002 |  4,570,440 |   4,560,160 |
+| nci     | 33.553.445 | 4,557,728 |  3,931,585 |   3,889,564 |
+| ooffice |  6.152.192 | 3,684,312 |  3,582,462 |   3,579,649 |
+| osdb    | 10.085.684 | 4,328,329 |  4,216,607 |   4,216,534 |
+| reymont |  6.627.202 | 2,712,863 |  2,304,258 |   2,272,241 |
+| samba   | 21.606.400 | 6,744,238 |  6,283,100 |   6,270,438 |
+| sao     |  7.251.944 | 6,102,068 |  5,938,370 |   5,936,135 |
+| webster | 41.458.703 | 16,345,668 | 14,834,226 |  14,764,309 |
+| xml     |  5.345.280 | 1,043,013|    828,667 |     818,717 |
+| x-ray   |  8.474.240 | 7,687,883 |  7,642,441 |   7,642,441 |
 
 
 ## License
