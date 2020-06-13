@@ -1,6 +1,7 @@
 #include "sdefl.h"
 
 #include <string.h> /* memcpy */
+#include <limits.h> /* CHAR_BIT */
 
 #define SDEFL_ZLIB_HDR      (0x01)
 
@@ -53,6 +54,13 @@ sdefl_npow2(int n)
 static int
 sdefl_ilog2(int n)
 {
+#ifdef _MSC_VER
+    unsigned long msbp;
+    _BitScanReverse(&msbp, (unsignd long)n);
+    return (int)msbp;
+#elif defined(__GNUC__) || defined(__clang__)
+    return (int)sizeof(unsigned long)*CHAR_BIT-1-__builtin_clzl((unsigned long)n);
+#else
     #define lt(n) n,n,n,n, n,n,n,n, n,n,n,n ,n,n,n,n
     static const char tbl[256] = {0,0,1,1,2,2,2,2,3,3,3,3,
         3,3,3,3,lt(4),lt(5),lt(5),lt(6),lt(6),lt(6),lt(6),
@@ -62,6 +70,7 @@ sdefl_ilog2(int n)
         return (t = (tt >> 8)) ? 24+tbl[t]: 16+tbl[tt];
     else return (t = (n >> 8)) ? 8+tbl[t]: tbl[n];
     #undef lt
+#endif
 }
 static unsigned
 sdefl_uload32(const void *p)
@@ -80,6 +89,9 @@ sdefl_hash32(const void *p)
 static unsigned char*
 sdefl_put(unsigned char *dst, struct sdefl *s, int code, int bitcnt)
 {
+    if (!bitcnt && code)
+        assert(!code);
+
     s->bits |= (code << s->cnt);
     s->cnt += bitcnt;
     while (s->cnt >= 8) {
@@ -97,7 +109,7 @@ sdefl_match(unsigned char *dst, struct sdefl *s, int dist, int len)
     static const short dmin[] = {1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,
         385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577};
     static const short dxmax[] = {0,6,12,24,48,96,192,384,768,1536,3072,6144,12288,24576};
-    static const unsigned char lslot[258+1] = {
+    static const unsigned char lat[258+1] = {
         0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 12,
         12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 16,
         16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18,
@@ -114,7 +126,7 @@ sdefl_match(unsigned char *dst, struct sdefl *s, int dist, int len)
         27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
         27, 27, 28
     };
-    int ls = lslot[len];
+    int ls = lat[len];
     int lc = 257 + ls;
     int dx = sdefl_ilog2(sdefl_npow2(dist) >> 2);
     int dc = dx ? ((dx + 1) << 1) + (dist > dxmax[dx]) : dist-1;
