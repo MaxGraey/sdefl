@@ -47,7 +47,7 @@ with size of the uncompressed block.
 | miniz 1.0 -6            |    27 MB/s |   260 MB/s |    36513697 | 36.51 |
 | miniz 1.0 -9            |    23 MB/s |   261 MB/s |    36460101 | 36.46 |
 
-Results on the [Silesia compression corpus][http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia]:
+Results on the [Silesia compression corpus](http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia):
 
 | File    |   Original | `sdefl 0`  	| `sdefl 5` 	| `sdefl 7` |
 | :------ | ---------: | -----------------: | ---------: | ----------: |
