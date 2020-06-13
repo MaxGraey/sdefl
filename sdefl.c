@@ -5,6 +5,7 @@
 
 #define SDEFL_ZLIB_HDR      (0x01)
 
+struct sdefl_match {int off, len;};
 static const unsigned char sdefl_mirror[256] = {
     #define R2(n) n, n + 128, n + 64, n + 192
     #define R4(n) R2(n), R2(n + 32), R2(n + 16), R2(n + 48)
@@ -106,7 +107,7 @@ sdefl_match(unsigned char *dst, struct sdefl *s, int dist, int len)
     static const short dmin[] = {1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,
         385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577};
     static const short dxmax[] = {0,6,12,24,48,96,192,384,768,1536,3072,6144,12288,24576};
-    static const unsigned char lat[258+1] = {
+    static const unsigned char lslot[258+1] = {
         0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 12,
         12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 16,
         16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18,
@@ -123,7 +124,7 @@ sdefl_match(unsigned char *dst, struct sdefl *s, int dist, int len)
         27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
         27, 27, 28
     };
-    int ls = lat[len];
+    int ls = lslot[len];
     int lc = 257 + ls;
     int dx = sdefl_ilog2(sdefl_npow2(dist) >> 2);
     int dc = dx ? ((dx + 1) << 1) + (dist > dxmax[dx]) : dist-1;
@@ -143,12 +144,33 @@ sdefl_lit(unsigned char *dst, struct sdefl *s, int c)
         return sdefl_put(dst, s, sdefl_mirror[0x30+c], 8);
     else return sdefl_put(dst, s, 1 + 2 * sdefl_mirror[0x90 - 144 + c], 9);
 }
+static void
+sdefl_fnd(struct sdefl_match *m, struct sdefl *s,
+    int chain_len, int limit, int max_match,
+    const unsigned char *in, int p)
+{
+    int i = s->tbl[sdefl_hash32(&in[p])];
+    while (i > limit) {
+        if (in[i+m->len] == in[p+m->len] &&
+            (sdefl_uload32(&in[i]) == sdefl_uload32(&in[p]))){
+            int n = SDEFL_MIN_MATCH;
+            while (n < max_match && in[i+n] == in[p+n]) n++;
+            if (n > m->len) {
+                m->len = n, m->off = p - i;
+                if (n == max_match) break;
+            }
+        }
+        if (!(--chain_len)) break;
+        i = s->prv[i&SDEFL_WIN_MSK];
+    }
+}
 static int
 sdefl_compr(struct sdefl *s, unsigned char *out,
     const unsigned char *in, int in_len, int lvl, unsigned flags)
 {
     int p = 0;
     unsigned char *q = out;
+    static const unsigned char pref[] = {8,10,14,24,30,48,65,96,130};
     int max_chain = (lvl < 8) ? (1<<(lvl+1)): (1<<13);
 
     s->bits = s->cnt = 0;
@@ -163,55 +185,27 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
     q = sdefl_put(q, s, 0x01, 1); /* block */
     q = sdefl_put(q, s, 0x01, 2); /* static huffman */
     while (p < in_len) {
-        int run, best_len = 0, dist = 0;
+        struct sdefl_match m = {0};
         int max_match = ((in_len-p)>SDEFL_MAX_MATCH) ? SDEFL_MAX_MATCH:(in_len-p);
+        int nice_match = pref[lvl] < max_match ? pref[lvl] : max_match;
+        int run = 1;
+
         if (max_match > SDEFL_MIN_MATCH) {
-            int chain_len = max_chain;
             int limit = ((p-SDEFL_WIN_SIZ)<SDEFL_NIL)?SDEFL_NIL:(p-SDEFL_WIN_SIZ);
-            int i = s->tbl[sdefl_hash32(&in[p])];
-            while (i > limit) {
-                if (in[i+best_len] == in[p+best_len] &&
-                    (sdefl_uload32(&in[i]) == sdefl_uload32(&in[p]))){
-                    int n = SDEFL_MIN_MATCH;
-                    while (n < max_match && in[i+n] == in[p+n]) n++;
-                    if (n > best_len) {
-                        best_len = n;
-                        dist = p - i;
-                        if (n == max_match)
-                            break;
-                    }
-                }
-                if (!(--chain_len)) break;
-                i = s->prv[i&SDEFL_WIN_MSK];
-            }
+            sdefl_fnd(&m, s, max_chain, limit, max_match, in, p);
         }
-        if (lvl >= 5 && best_len >= SDEFL_MIN_MATCH && best_len < max_match){
-            const int x = p + 1;
-            int chain_len = max_chain;
-            int tar_len = best_len + 1;
+        if (lvl >= 5 && m.len >= SDEFL_MIN_MATCH && m.len < nice_match){
+            int x = p + 1;
+            struct sdefl_match m2 = {0};
             int limit = ((x-SDEFL_WIN_SIZ)<SDEFL_NIL)?SDEFL_NIL:(x-SDEFL_WIN_SIZ);
-            int i = s->tbl[sdefl_hash32(&in[p])];
-            while (i > limit) {
-                if (in[i+best_len] == in[x+best_len] &&
-                    (sdefl_uload32(&in[i]) == sdefl_uload32(&in[x]))){
-                    int n = SDEFL_MIN_MATCH;
-                    while (n < tar_len && in[i+n] == in[x+n]) n++;
-                    if (n == tar_len) {
-                        best_len = 0;
-                        break;
-                    }
-                }
-                if (!(--chain_len)) break;
-                i = s->prv[i&SDEFL_WIN_MSK];
-            }
+            sdefl_fnd(&m2, s, max_chain, limit, m.len+1, in, x);
+            if (m2.len > m.len) m.len = 0;
         }
-        if (best_len >= SDEFL_MIN_MATCH) {
-            q = sdefl_match(q, s, dist, best_len);
-            run = best_len;
-        } else {
-            q = sdefl_lit(q, s, in[p]);
-            run = 1;
-        }
+        if (m.len >= SDEFL_MIN_MATCH) {
+            q = sdefl_match(q, s, m.off, m.len);
+            run = m.len;
+        } else q = sdefl_lit(q, s, in[p]);
+
         while (run-- != 0) {
             unsigned h = sdefl_hash32(&in[p]);
             s->prv[p&SDEFL_WIN_MSK] = s->tbl[h];
