@@ -146,11 +146,11 @@ sdefl_lit(unsigned char **dst, struct sdefl *s, int c)
     else sdefl_put(dst, s, 1 + 2 * sdefl_mirror[0x90 - 144 + c], 9);
 }
 static void
-sdefl_fnd(struct sdefl_match *m, struct sdefl *s,
-    int chain_len, int limit, int max_match,
-    const unsigned char *in, int p)
+sdefl_fnd(struct sdefl_match *m, const struct sdefl *s,
+    int chain_len, int max_match, const unsigned char *in, int p)
 {
     int i = s->tbl[sdefl_hash32(&in[p])];
+    int limit = ((p-SDEFL_WIN_SIZ)<SDEFL_NIL)?SDEFL_NIL:(p-SDEFL_WIN_SIZ);
     while (i > limit) {
         if (in[i+m->len] == in[p+m->len] &&
             (sdefl_uload32(&in[i]) == sdefl_uload32(&in[p]))){
@@ -191,16 +191,12 @@ sdefl_compr(struct sdefl *s, unsigned char *out,
         int nice_match = pref[lvl] < max_match ? pref[lvl] : max_match;
         int run = 1;
 
-        if (max_match > SDEFL_MIN_MATCH) {
-            int limit = ((p-SDEFL_WIN_SIZ)<SDEFL_NIL)?SDEFL_NIL:(p-SDEFL_WIN_SIZ);
-            sdefl_fnd(&m, s, max_chain, limit, max_match, in, p);
-        }
+        if (max_match > SDEFL_MIN_MATCH)
+            sdefl_fnd(&m, s, max_chain, max_match, in, p);
         if (lvl >= 5 && m.len >= SDEFL_MIN_MATCH && m.len < nice_match){
-            int x = p + 1;
             struct sdefl_match m2 = {0};
-            int limit = ((x-SDEFL_WIN_SIZ)<SDEFL_NIL)?SDEFL_NIL:(x-SDEFL_WIN_SIZ);
-            sdefl_fnd(&m2, s, max_chain, limit, m.len+1, in, x);
-            if (m2.len > m.len) m.len = 0;
+            sdefl_fnd(&m2, s, max_chain, m.len+1, in, p+1);
+            m.len = (m2.len > m.len) ? 0 : m.len;
         }
         if (m.len >= SDEFL_MIN_MATCH) {
             sdefl_match(&q, s, m.off, m.len);
