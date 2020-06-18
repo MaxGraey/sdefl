@@ -44,13 +44,7 @@ sdefl_adler32(unsigned adler32, const unsigned char *in, int in_len)
 static int
 sdefl_npow2(int n)
 {
-    n--;
-    n |= n >> 1;
-    n |= n >> 2;
-    n |= n >> 4;
-    n |= n >> 8;
-    n |= n >> 16;
-    return (int)++n;
+    return 1 << (sdefl_ilog2(n - 1) + 1);
 }
 static int
 sdefl_ilog2(int n)
