@@ -44,7 +44,17 @@ sdefl_adler32(unsigned adler32, const unsigned char *in, int in_len)
 static int
 sdefl_npow2(int n)
 {
+#if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
     return 1 << (sdefl_ilog2(n - 1) + 1);
+#else
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    return (int)++n;
+#endif
 }
 static int
 sdefl_ilog2(int n)
